@@ -291,7 +291,11 @@ endfunction(add_test_restart_exact)
 # additions override the base. Call it before the add_test_* function that runs the test.
 function(compose_test_input TEST_NAME BASE_NAME)
     set(base_file ${CMAKE_CURRENT_SOURCE_DIR}/test_files/${BASE_NAME}/${BASE_NAME}.i)
-    set(add_file ${CMAKE_CURRENT_SOURCE_DIR}/test_files/${TEST_NAME}/${TEST_NAME}_additions.i)
+    set(add_name ${TEST_NAME})
+    if(ARGC GREATER 2)
+        set(add_name ${ARGV2})
+    endif()
+    set(add_file ${CMAKE_CURRENT_SOURCE_DIR}/test_files/${add_name}/${add_name}_additions.i)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${base_file} ${add_file})
     file(READ ${base_file} base_text)
     file(READ ${add_file} add_text)
@@ -1078,4 +1082,32 @@ foreach(mode lockstep subcycle)
       ${subcycle} ${GLS_MPI_COMMANDS})
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 120 PROCESSORS ${NP}
       WORKING_DIRECTORY "${CURRENT_TEST_BINARY_DIR}" LABELS "regression")
+endforeach()
+
+# Manufactured turbulence fields exercise the actual predictor and two-interface solve.
+foreach(case predictor bounds solve)
+    set(nz 3)
+    if(case STREQUAL "solve")
+        set(nz 4)
+    endif()
+    add_test_run(GLS_correction_${case} DoublyPeriodic remora_gls_correction
+      "amr.max_level=0 remora.n_cell=12 12 ${nz} remora.is_periodic=1 1 0 remora.bc.ylo.type=Periodic remora.bc.yhi.type=Periodic remora.fixed_dt=10 remora.max_step=0 remora.plot_int=-1 remora.check_int=-1 remora.vertical_mixing_type=gls remora.gls_stability_type=canuto_a remora.gls_Pmin=1e-5 test.case=${case}")
+endforeach()
+
+compose_test_input(GLS_Seamount_layout Seamount)
+add_test_layout(GLS_Seamount_layout GLS_Seamount_layout remora_gls_correction
+  "plt00003" "chk00003" "remora.omp_tile_size=8 8 1024000"
+  "remora.omp_tile_size=1024000 1024000 1024000")
+
+foreach(mode lockstep subcycle)
+    set(name GLS_adaptive_restart_${mode})
+    compose_test_input(${name} Channel_Test_ML_seam GLS_adaptive_restart)
+    if(mode STREQUAL "subcycle")
+        set(subcycle 1)
+    else()
+        set(subcycle 0)
+    endif()
+    add_test_layout(${name} ${name} remora_gls_correction "plt00003" "chk00003"
+      "remora.do_substep=${subcycle}"
+      "remora.do_substep=${subcycle} remora.restart=../runA/chk00002 test.case=evolve")
 endforeach()

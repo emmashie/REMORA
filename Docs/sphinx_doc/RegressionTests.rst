@@ -15,10 +15,15 @@ There are currently 70 regression tests which are run as part of every PR on a r
 * 8 that assert a run reaches a behavior it reports in its log;
 * 11 that assert a misconfigured input fails for the stated reason.
 
+The GLS correction checks additionally test upstream fluxes, thickness-weighted
+advection floors, implicit-solve floors, and the stability limiter against independent
+reference calculations. A Seamount case checks tile independence, and moving-patch
+cases check adaptive restart in lockstep and subcycling; see :ref:`gls-closure-tests`.
+
 PnetCDF builds add two more that assert the structure of the refined grid, read from a NetCDF grid
 file's ``refinement`` variable (see :ref:`sec:ci-tagging-tests`).
 
-There are also five unit tests, ``DateClock``, ``LatLonRegrid``, ``BoundaryInterp``, ``BiologyInterface`` and, in PnetCDF builds, ``NCFormats``, which is also labelled ``regression``. The CI tests use cmake and are based on the version
+The ``GLS_math`` unit test is also labelled ``regression``. There are also five other unit tests, ``DateClock``, ``LatLonRegrid``, ``BoundaryInterp``, ``BiologyInterface`` and, in PnetCDF builds, ``NCFormats``, which is also labelled ``regression``. The CI tests use cmake and are based on the version
 of AMReX in the REMORA submodule. This suite can be run following the
 instructions in :ref:`Testing<Testing>`, which also describes the different kinds of assertion and what
 each is for. All of them run under MPI on two ranks, and are checked to be rank-invariant.

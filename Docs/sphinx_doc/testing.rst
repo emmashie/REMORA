@@ -64,8 +64,36 @@ parallel based on how many processes each test is specified to use and fit them 
 on the machine.
 Output for the last set of tests run is available in the ``Build`` directory in ``Testing/Temporary/LastTest.log``.
 
-GLS level lifecycle checks
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _gls-closure-tests:
+
+GLS closure and level lifecycle checks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Run ``ctest -R GLS_ --output-on-failure`` for the closure and regrid checks.
+``GLS_math`` checks the expanded upstream face stencil for both flow directions,
+both horizontal axes, masked gradients, and physical-edge extrapolation. It also
+checks the ``Gh`` transition, monotonicity, and the inactive denominator's zero.
+
+``GLS_correction_predictor`` calls the predictor on manufactured fields with
+distinct history components, both signs of transport, and both predictor time
+coefficient sets. ``GLS_correction_bounds`` uses 0.25 m and 4 m layers to activate
+the thickness-weighted floors after horizontal and vertical advection.
+``GLS_correction_solve`` uses a three-interface column in which the bottom and
+middle GLS values hit the physical minimum; the upper value must reflect both
+limits during substitution. A second profile keeps the middle value above its floor
+so the bottom limit is checked independently. These manufactured-column tests use a GLS minimum
+of 1e-5 to expose the solve's result without activating the length cap. The physical
+application defaults, including the TKE minimum, are unchanged.
+The references use the expanded stencil and independently evaluated column equations
+from the GLS files at `COAWST snapshot 1d7b0baa
+<https://github.com/jcwarner-usgs/COAWST/tree/1d7b0baa23b4065c64c0d889b94439371e94f16b/ROMS/Nonlinear>`_.
+
+``GLS_Seamount_layout`` advances Canuto A at a 10 s timestep and compares plotfiles
+and every checkpoint field between tiled and untiled runs. The two
+``GLS_adaptive_restart_*`` cases move the refined patch after the first step, assert
+that its layout changed and all seven turbulence fields remain finite, and compare
+all valid checkpoint values against a restart. Both lockstep and subcycling are
+covered. These short model runs retain the default turbulence minima and length cap.
 
 Run ``ctest -R GLS_regrid_ --output-on-failure`` to check turbulence transfer through
 changing refinement layouts. These two-level cases reuse the channel setup, advance

@@ -1,33 +1,33 @@
 ===============================================================================
  REMORA Job Information
 ===============================================================================
-inputs file: /home/klion/software/REMORA_codex/.claude/worktrees/fix-particle-seamount-655/Build_ci/Tests/test_files/Upwelling_GLS/Upwelling_GLS.i
+inputs file: /private/tmp/remora-pr892/Tests/test_files/Upwelling_GLS/Upwelling_GLS.i
 
 number of MPI processes: 1
 
-CPU time used since start of simulation (CPU-hours): 0.0092647
+CPU time used since start of simulation (CPU-hours): 0.00258566
 
 ===============================================================================
  Plotfile Information
 ===============================================================================
-output data / time: Wed Oct 14 15:27:24 2026
-output dir:         /home/klion/software/REMORA_codex/.claude/worktrees/fix-particle-seamount-655/Build_ci/Tests/test_files/Upwelling_GLS
+output data / time: Wed Nov 18 14:08:16 2026
+output dir:         /private/tmp/remora-891-gold/Upwelling_GLS
 
 
 ===============================================================================
  Build Information
 ===============================================================================
-build date:    Oct 14 2026 14:56:11
-build machine: Linux varan 6.11.0-21-generic #21~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Mon Feb 24 16:52:15 UTC 2 x86_64
-build dir:     /home/klion/software/REMORA_codex/.claude/worktrees/fix-particle-seamount-655/Build_ci/Exec
-AMReX dir:     /home/klion/software/REMORA_codex/.claude/worktrees/fix-particle-seamount-655/Submodules/AMReX
+build date:    Nov 18 2026 14:07:32
+build machine: macOS WE52845 26.7.3 25G342 arm64
+build dir:     /tmp/remora-pr892/BuildDebug/Exec
+AMReX dir:     /tmp/remora-pr892/Submodules/AMReX
 
-COMP:          GNU
-COMP version:  13.3.0
+COMP:          AppleClang
+COMP version:  21.0.0.21000334
 
 
-REMORA       git hash: v1.7-194-g04591ec10ec1
-AMReX       git hash: 26.09-185-g19d64c697f1a
+REMORA       git hash: 74c2a732dee3-dirty
+AMReX       git hash: 26.11
 
 
 ===============================================================================
@@ -55,6 +55,7 @@ amr.check_input = true
 amr.grid_eff = 0.69999999999999996
 amr.max_grid_iterations = 4
 amr.max_grid_size = 2048
+amr.max_grid_size_z = 16
 amr.max_level = 0
 amr.n_cell = 41 80 16
 amr.n_error_buf = 0
@@ -70,9 +71,11 @@ amrex.abort_on_out_of_gpu_memory = false
 amrex.abort_on_unused_inputs = false
 amrex.async_out = false
 amrex.async_out_nfiles = 64
+amrex.fb.on_arrival_min_bytes = 65536
 amrex.fpe_trap_invalid = 1
 amrex.fpe_trap_overflow = false
 amrex.fpe_trap_zero = false
+amrex.handle_crt_reports = true
 amrex.handle_sigabrt = true
 amrex.handle_sigfpe = true
 amrex.handle_sigill = true
@@ -103,7 +106,7 @@ amrex.use_gpu_aware_mpi = false
 amrex.vector_growth_factor = 1.5
 amrex.verbose = 1
 fabarray.comm_tile_size = 1024000 1024000 1024000
-fabarray.mfiter_tile_size = 8 8 1024000
+fabarray.mfiter_tile_size = 16 16 1024000
 geometry.coord_sys = 0
 geometry.is_periodic = 1 0 0
 geometry.prob_hi = 41000.0 80000.0 0.0
@@ -141,10 +144,15 @@ remora.blk_ZT = 10.0
 remora.blk_ZW = 10.0
 remora.bottom_stress_type = "linear"
 remora.boundary_per_variable = false
+remora.bulk_flux_current_factor = 1.0
+remora.bulk_flux_relative_wind = false
+remora.bulk_flux_scheme = "coare30"
 remora.bulk_fluxes = false
+remora.cf_2d_fill_cache = 1
 remora.cf_avgdown_bar = 1
 remora.cf_avgdown_perimeter = 1
 remora.cf_avgdown_stencil = 1
+remora.cf_avgdown_volume_weighted = 0
 remora.cf_fill_all_kcomp = 1
 remora.cf_fill_vel_after = 0
 remora.cf_flux_pc = 1
@@ -158,6 +166,7 @@ remora.check_cf_metrics = 0
 remora.check_cf_tol = 9.9999999999999998e-13
 remora.check_file = chk
 remora.check_int = -57600
+remora.check_int = -1
 remora.check_int_time = -1.0
 remora.check_mask_consistency = true
 remora.check_plot_z = 0
@@ -178,6 +187,8 @@ remora.do_rivers_temp = true
 remora.do_salt_clim_nudg = false
 remora.do_substep = 1
 remora.do_temp_clim_nudg = false
+remora.drop_dry_boxes = true
+remora.dry_ghost_test = 0
 remora.eminusp = false
 remora.eminusp_correct_ssh = false
 remora.eminusp_type = "computed"
@@ -211,6 +222,8 @@ remora.init_ana_T = false
 remora.init_l0int_T = true
 remora.init_l1ad_T = false
 remora.is_periodic = 1 0 0
+remora.load_balance = "sfc"
+remora.load_balance_land_weight = 1.0
 remora.longwave_down = false
 remora.longwave_is_net = false
 remora.longwave_netcdf_varname = "lwrad"
@@ -229,6 +242,7 @@ remora.output_forcing = false
 remora.pair_type = "constant"
 remora.plot_file = plt
 remora.plot_int = 100
+remora.plot_int = 10
 remora.plot_int_time = -1.0
 remora.plot_vars_3d = salt temp x_velocity y_velocity z_velocity
 remora.plotfile_type = amrex
@@ -264,9 +278,7 @@ remora.tnudg = 0.0
 remora.tracer_horizontal_advection_scheme = "upstream3"
 remora.use_coriolis = true
 remora.use_curvilinear_grid = false
-remora.use_prestep = true
 remora.use_salt = true
-remora.use_uv3dmix = true
 remora.uv_horizontal_advection_scheme = "upstream3"
 remora.uwind = 0.0
 remora.uwind_type = "analytic"

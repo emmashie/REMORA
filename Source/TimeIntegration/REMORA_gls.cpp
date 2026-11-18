@@ -1,4 +1,5 @@
 #include <REMORA.H>
+#include <REMORA_GLS.H>
 #include <limits>
 
 using namespace amrex;
@@ -76,7 +77,7 @@ REMORA::gls_prestep (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
         const auto dlo = amrex::lbound(domain);
         const auto dhi = amrex::ubound(domain);
 
-        GeometryData const& geomdata = geom[0].data();
+        GeometryData const& geomdata = geom[lev].data();
         bool is_periodic_in_x = geomdata.isPeriodic(0);
         bool is_periodic_in_y = geomdata.isPeriodic(1);
 
@@ -101,58 +102,21 @@ REMORA::gls_prestep (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
         auto FC  = fab_FC.array();
         auto FCL = fab_FCL.array();
 
-        // need XF/FX/FXL from  [xlo to xhi] by [ylo to yhi  ] on u points
         ParallelFor(grow(xbx,IntVect(0,0,-1)), [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
-            Real grad_im1 = (tke(i-1,j,k,nstp) - tke(i-2,j,k,nstp)) * msku(i-1,j,0);
-            Real grad_ip1 = (tke(i+1,j,k,nstp) - tke(i  ,j,k,nstp)) * msku(i+1,j,0);
-
-            Real gradL_im1 = (gls(i-1,j,k,nstp) - gls(i-2,j,k,nstp)) * msku(i-1,j,0);
-            Real gradL_ip1 = (gls(i+1,j,k,nstp) - gls(i  ,j,k,nstp)) * msku(i+1,j,0);
-
-            // Adjust boundaries
-            // TODO: Make sure indices match with what ROMS does
-            if (i == dlo.x-1 && !is_periodic_in_x) {
-                grad_im1  = tke(i,j,k,nstp) - tke(i-1,j,k,nstp);
-                gradL_im1 = gls(i,j,k,nstp) - gls(i-1,j,k,nstp);
-            }
-            else if (i == dhi.x+1 && !is_periodic_in_x) {
-                grad_ip1  = tke(i,j,k,nstp) - tke(i-1,j,k,nstp);
-                gradL_ip1 = gls(i,j,k,nstp) - gls(i-1,j,k,nstp);
-            }
-            Real cff = one/Real(6.0);
             XF(i,j,k) = Real(0.5) * (Huon(i,j,k) + Huon(i,j,k-1));
-            FX(i,j,k) = XF(i,j,k) * Real(0.5) * (tke(i-1,j,k,nstp) + tke(i,j,k,nstp) -
-                cff * (grad_ip1 - grad_im1));
-            FXL(i,j,k) = XF(i,j,k) * Real(0.5) * (gls(i-1,j,k,nstp) + gls(i,j,k,nstp) -
-                cff * (gradL_ip1 - gradL_im1));
+            FX(i,j,k) = gls::upstream_flux(tke, msku, i,j,k,nstp, 0, XF(i,j,k),
+                                          dlo.x, dhi.x, is_periodic_in_x);
+            FXL(i,j,k) = gls::upstream_flux(gls, msku, i,j,k,nstp, 0, XF(i,j,k),
+                                           dlo.x, dhi.x, is_periodic_in_x);
         });
-
-        // need EF/FE/FEL from  [xlo to xhi  ] by [ylo to yhi+1]
         ParallelFor(grow(ybx,IntVect(0,0,-1)), [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
-            Real grad_jm1 = (tke(i,j-1,k,nstp) - tke(i,j-2,k,nstp)) * mskv(i,j-1,0);
-            Real grad_jp1 = (tke(i,j+1,k,nstp) - tke(i,j  ,k,nstp)) * mskv(i,j+1,0);
-
-            Real gradL_jm1 = (gls(i,j-1,k,nstp) - gls(i,j-2,k,nstp)) * mskv(i,j-1,0);
-            Real gradL_jp1 = (gls(i,j+1,k,nstp) - gls(i,j  ,k,nstp)) * mskv(i,j+1,0);
-
-            // Adjust boundaries
-            // TODO: Make sure indices match with what ROMS does
-            if (j == dlo.y-1 && !is_periodic_in_y) {
-                grad_jm1  = tke(i,j,k,nstp) - tke(i,j-1,k,nstp);
-                gradL_jm1 = gls(i,j,k,nstp) - gls(i,j-1,k,nstp);
-            }
-            else if (j == dhi.y+1 && !is_periodic_in_y) {
-                grad_jp1  = tke(i,j,k,nstp) - tke(i,j-1,k,nstp);
-                gradL_jp1 = gls(i,j,k,nstp) - gls(i,j-1,k,nstp);
-            }
-            Real cff = one/Real(6.0);
             EF(i,j,k) = Real(0.5) * (Hvom(i,j,k) + Hvom(i,j,k-1));
-            FE(i,j,k) = EF(i,j,k) * Real(0.5) * (tke(i,j-1,k,nstp) + tke(i,j,k,nstp) -
-                cff * (grad_jp1 - grad_jm1));
-            FEL(i,j,k) = EF(i,j,k) * Real(0.5) * (gls(i,j-1,k,nstp) + gls(i,j,k,nstp) -
-                cff * (gradL_jp1 - gradL_jm1));
+            FE(i,j,k) = gls::upstream_flux(tke, mskv, i,j,k,nstp, 1, EF(i,j,k),
+                                          dlo.y, dhi.y, is_periodic_in_y);
+            FEL(i,j,k) = gls::upstream_flux(gls, mskv, i,j,k,nstp, 1, EF(i,j,k),
+                                           dlo.y, dhi.y, is_periodic_in_y);
         });
 
         Real gamma = one / Real(6.0);
@@ -410,7 +374,6 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
 
     Real Zos_min = std::max(solverChoice.Zos, Real(0.0001));
     Real Zos_eff = Zos_min;
-    Real Gadv = one/Real(3.0);
     Real eps = Real(1.0e-10);
 
     const BoxArray&            ba = cons_old[lev]->boxArray();
@@ -421,11 +384,11 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
     // shear2/buoy2 are per-tile FArrayBoxes in the loops below.
     MultiFab mf_shear2_cached(ba,dm,1,IntVect(NGROW,NGROW,0));
 
-    const Box& domain = geom[0].Domain();
+    const Box& domain = geom[lev].Domain();
     const auto dlo = amrex::lbound(domain);
     const auto dhi = amrex::ubound(domain);
 
-    GeometryData const& geomdata = geom[0].data();
+    GeometryData const& geomdata = geom[lev].data();
     bool is_periodic_in_x = geomdata.isPeriodic(0);
     bool is_periodic_in_y = geomdata.isPeriodic(1);
 
@@ -485,8 +448,6 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
     int ncomp_fab = 0;
     int tmp_buoy_comp  = ncomp_fab++;
     int tmp_shear_comp = ncomp_fab++;
-    int curvK_comp = ncomp_fab++;
-    int curvP_comp = ncomp_fab++;
     int FXK_comp = ncomp_fab++;
     int FXP_comp = ncomp_fab++;
     int FEK_comp = ncomp_fab++;
@@ -551,8 +512,6 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
 
         auto tmp_buoy = fab.array(tmp_buoy_comp);
         auto tmp_shear = fab.array(tmp_shear_comp);
-        auto curvK = fab.array(curvK_comp);
-        auto curvP = fab.array(curvP_comp);
         auto FXK = fab.array(FXK_comp);
         auto FXP = fab.array(FXP_comp);
         auto FEK = fab.array(FEK_comp);
@@ -579,69 +538,21 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
             shear2(i,j,k)=Real(0.25) * (tmp_shear(i,j,k) + tmp_shear(i-1,j,k) + tmp_shear(i,j-1,k)+tmp_shear(i-1,j-1,k));
         });
 
-        //Time step advective terms
-        ParallelFor(growLo(grow(xbx,IntVect(0,0,-1)),0,1), [=] AMREX_GPU_DEVICE (int i, int j, int k)
-        {
-            Real gradK, gradK_ip1, gradP, gradP_ip1;
-
-            if (i == dlo.x-1 && !is_periodic_in_x) {
-                gradK_ip1 = tke(i+1,j,k,2)-tke(i  ,j,k,2);
-                gradK = gradK_ip1;
-                gradP_ip1 = gls(i+1,j,k,2)-gls(i  ,j,k,2);
-                gradP = gradP_ip1;
-            } else if (i == dhi.x+1 && !is_periodic_in_x) {
-                gradK = tke(i  ,j,k,2)-tke(i-1,j,k,2);
-                gradK_ip1 = gradK;
-                gradP = gls(i  ,j,k,2)-gls(i-1,j,k,2);
-                gradP_ip1 = gradP;
-            } else {
-                gradK     = (tke(i  ,j,k,2)-tke(i-1,j,k,2)) * msku(i  ,j,0);
-                gradK_ip1 = (tke(i+1,j,k,2)-tke(i  ,j,k,2)) * msku(i+1,j,0);
-                gradP     = (gls(i  ,j,k,2)-gls(i-1,j,k,2)) * msku(i  ,j,0);
-                gradP_ip1 = (gls(i+1,j,k,2)-gls(i  ,j,k,2)) * msku(i+1,j,0);
-            }
-
-            curvK(i,j,k) = gradK_ip1 - gradK;
-            curvP(i,j,k) = gradP_ip1 - gradP;
-        });
         ParallelFor(grow(xbx,IntVect(0,0,-1)), [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
-            Real cff = Real(0.5) * (Huon(i,j,k) + Huon(i,j,k-1));
-            Real cff1 = (cff > zero) ? curvK(i-1,j,k) : curvK(i,j,k);
-            Real cff2 = (cff > zero) ? curvP(i-1,j,k) : curvP(i,j,k);
-
-            FXK(i,j,k) = cff * Real(0.5) * (tke(i-1,j,k,2)+tke(i,j,k,2)-Gadv*cff1);
-            FXP(i,j,k) = cff * Real(0.5) * (gls(i-1,j,k,2)+gls(i,j,k,2)-Gadv*cff2);
-        });
-
-        //Time step advective terms
-        ParallelFor(growLo(grow(ybx,IntVect(0,0,-1)),1,1), [=] AMREX_GPU_DEVICE (int i, int j, int k)
-        {
-            Real gradK     = (tke(i,j  ,k,2)-tke(i,j-1,k,2)) * mskv(i,j  ,0);
-            Real gradK_jp1 = (tke(i,j+1,k,2)-tke(i,j  ,k,2)) * mskv(i,j+1,0);
-            Real gradP     = (gls(i,j  ,k,2)-gls(i,j-1,k,2)) * mskv(i,j  ,0);
-            Real gradP_jp1 = (gls(i,j+1,k,2)-gls(i,j  ,k,2)) * mskv(i,j+1,0);
-
-            if (j == dlo.y-1 && !is_periodic_in_y) {
-                gradK = gradK_jp1;
-                gradP = gradP_jp1;
-            }
-            else if (j == dhi.y+1 && !is_periodic_in_y) {
-                gradK_jp1 = gradK;
-                gradP_jp1 = gradP;
-            }
-
-            curvK(i,j,k) = gradK_jp1 - gradK;
-            curvP(i,j,k) = gradP_jp1 - gradP;
+            const Real transport = Real(0.5) * (Huon(i,j,k) + Huon(i,j,k-1));
+            FXK(i,j,k) = gls::upstream_flux(tke, msku, i,j,k,2, 0, transport,
+                                           dlo.x, dhi.x, is_periodic_in_x);
+            FXP(i,j,k) = gls::upstream_flux(gls, msku, i,j,k,2, 0, transport,
+                                           dlo.x, dhi.x, is_periodic_in_x);
         });
         ParallelFor(grow(ybx,IntVect(0,0,-1)), [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
-            Real cff = Real(0.5) * (Hvom(i,j,k) + Hvom(i,j,k-1));
-            Real cff1 = (cff > zero) ? curvK(i,j-1,k) : curvK(i,j,k);
-            Real cff2 = (cff > zero) ? curvP(i,j-1,k) : curvP(i,j,k);
-
-            FEK(i,j,k) = cff * Real(0.5) * (tke(i,j-1,k,2)+tke(i,j,k,2)-Gadv*cff1);
-            FEP(i,j,k) = cff * Real(0.5) * (gls(i,j-1,k,2)+gls(i,j,k,2)-Gadv*cff2);
+            const Real transport = Real(0.5) * (Hvom(i,j,k) + Hvom(i,j,k-1));
+            FEK(i,j,k) = gls::upstream_flux(tke, mskv, i,j,k,2, 1, transport,
+                                           dlo.y, dhi.y, is_periodic_in_y);
+            FEP(i,j,k) = gls::upstream_flux(gls, mskv, i,j,k,2, 1, transport,
+                                           dlo.y, dhi.y, is_periodic_in_y);
         });
 
         // Vertical advection
@@ -672,18 +583,19 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
         Real gls_Pmin = solverChoice.gls_Pmin;
         ParallelFor(grow(bx,IntVect(0,0,-1)), [=] AMREX_GPU_DEVICE (int i, int j, int k)
         {
+            const Real thickness = Real(0.5) * (Hz(i,j,k) + Hz(i,j,k-1));
             Real cff = dt_lev * pm(i,j,0) * pn(i,j,0);
             Real tke_new = tke(i,j,k,nnew) - cff * (FXK(i+1,j  ,k)-FXK(i,j,k)+
                                                     FEK(i  ,j+1,k)-FEK(i,j,k));
-            tke_new = std::max(tke_new, gls_Kmin);
+            tke_new = std::max(tke_new, thickness * gls_Kmin);
             tke_new = tke_new - cff*(FCK(i,j,k  )-FCK(i,j,k-1));
-            tke(i,j,k,nnew) = std::max(tke_new,gls_Kmin);
+            tke(i,j,k,nnew) = std::max(tke_new, thickness * gls_Kmin);
 
             Real gls_new = gls(i,j,k,nnew) - cff * (FXP(i+1,j  ,k)-FXP(i,j,k)+
                                                     FEP(i  ,j+1,k)-FEP(i,j,k));
-            gls_new = std::max(gls_new, gls_Pmin);
+            gls_new = std::max(gls_new, thickness * gls_Pmin);
             gls_new = gls_new - cff*(FCP(i,j,k  )-FCP(i,j,k-1));
-            gls(i,j,k,nnew) = std::max(gls_new,gls_Pmin);
+            gls(i,j,k,nnew) = std::max(gls_new, thickness * gls_Pmin);
         });
 
         // Compute vertical mixing, turbulent production and turbulent
@@ -826,8 +738,10 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
                 gls(i,j,k,nnew) = cff_BCP * (gls(i,j,k,nnew) - FCP(i,j,k)*gls(i,j,k+1,nnew));
             }
             gls(i,j,1,nnew) = gls(i,j,1,nnew)-cff_BCP*gls_fluxb;
+            gls(i,j,1,nnew) = std::max(gls(i,j,1,nnew), gls_Pmin);
             for (int k=2; k<=N; k++) {
                 gls(i,j,k,nnew) = gls(i,j,k,nnew) - CF(i,j,k) * gls(i,j,k-1,nnew);
+                gls(i,j,k,nnew) = std::max(gls(i,j,k,nnew), gls_Pmin);
             }
         });
 
@@ -871,9 +785,7 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
             Real Sh, Sm;
             Real Gh=std::min(gls_Gh0,-buoy2(i,j,k)*Ls_lmt*Ls_lmt/
                             (two*tke_new));
-            Gh=std::min(Gh,Gh-(Gh-gls_Ghcri)*(Gh-gls_Ghcri)/
-                       (Gh+gls_Gh0-two*gls_Ghcri));
-            Gh=std::max(Gh,gls_Ghmin);
+            Gh = gls::limit_Gh(Gh, gls_Gh0, gls_Ghcri, gls_Ghmin);
 
             if (gls_stability_type == GLS_StabilityType::Canuto_A ||
                 gls_stability_type == GLS_StabilityType::Canuto_B) {

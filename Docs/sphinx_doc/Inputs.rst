@@ -1690,6 +1690,15 @@ List of drag-related parameters
 List of GLS-specific parameters
 -------------------------------
 
+Both GLS advection stages use third-order upstream horizontal fluxes, including
+masked gradients and the ROMS physical-edge gradient extrapolation. During
+advection, the TKE and GLS minima are multiplied by the interface thickness because
+the transported quantities are thickness weighted. During implicit substitution,
+physical GLS minima are applied before each value enters the next interface.
+The ``Gh`` stability limiter applies its quadratic correction only above
+``gls_Ghcri``. These equations follow the corrected
+`ROMS GLS closure <https://github.com/myroms/roms/pull/51>`_.
+
 With ``remora.vertical_mixing_type = gls``, a regrid retains TKE and GLS history,
 length scale, viscosity and diffusivities in overlapping fine cells. Newly refined
 cells interpolate the coarse latest history into both fine history slots. Scratch

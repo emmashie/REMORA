@@ -31,6 +31,16 @@ endif ()
 set_target_properties(remora_gls_regrid PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Exec)
 
+add_executable(remora_gls_correction tools/remora_gls_correction.cpp
+  ${PROJECT_SOURCE_DIR}/Exec/REMORA_Prob.cpp)
+target_include_directories(remora_gls_correction PRIVATE ${PROJECT_SOURCE_DIR}/Exec)
+target_link_libraries(remora_gls_correction PRIVATE remora_api)
+if (REMORA_ENABLE_CUDA)
+  setup_target_for_cuda_compilation(remora_gls_correction)
+endif ()
+set_target_properties(remora_gls_correction PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/Exec)
+
 include(${CMAKE_CURRENT_SOURCE_DIR}/CTestList.cmake)
 
 add_subdirectory(Unit)

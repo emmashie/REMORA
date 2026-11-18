@@ -10,3 +10,6 @@
 *.cpp text eol=lf
 *.H   text eol=lf
 *.h   text eol=lf
+
+# AMReX plotfile data have a text header followed by a binary payload.
+Tests/REMORA_Gold_Files/**/*_D_* binary
