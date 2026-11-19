@@ -770,9 +770,9 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
                                                 std::sqrt(Real(0.56)*tke_new/
                                                 (std::max(Real(0.0),buoy2(i,j,k))+eps))) : Ls_unlmt;
             //
-            // L <= kappa*Depth (ROMS gls_corstep.F). The Galperin limit above
+            // L <= 0.4*Depth (ROMS gls_corstep.F). The Galperin limit above
             // applies only where buoy2 > 0; this bounds L everywhere else.
-            if (l_cap) { Ls_lmt = std::min(Ls_lmt, vonKar * (z_w(i,j,N+1) - z_w(i,j,0))); }
+            if (l_cap) { Ls_lmt = std::min(Ls_lmt, Real(0.4) * (z_w(i,j,N+1) - z_w(i,j,0))); }
             //
             //  Recompute gls based on limited length scale
             //
@@ -852,7 +852,7 @@ REMORA::gls_corrector (int lev, MultiFab* mf_gls, MultiFab* mf_tke,
         //             std::pow(gls(i,j,k,nnew),gls_exp1)*cmu_fac1*
         //             std::pow(tke(i,j,k,nnew),-tke_exp1));
         //         dmax = std::max(dmax, Ls_u);
-        //         dcap = std::max(dcap, vonKar*(z_w(i,j,N+1)-z_w(i,j,0)));
+        //         dcap = std::max(dcap, Real(0.4)*(z_w(i,j,N+1)-z_w(i,j,0)));
         //     });
         //     amrex::Print() << "    [LSCALE] max uncapped L = " << dmax
         //                    << " m,  cap = " << dcap << " m\n";

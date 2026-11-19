@@ -1698,6 +1698,13 @@ physical GLS minima are applied before each value enters the next interface.
 The ``Gh`` stability limiter applies its quadratic correction only above
 ``gls_Ghcri``. These equations follow the corrected
 `ROMS GLS closure <https://github.com/myroms/roms/pull/51>`_.
+The default length cap is 0.4 times total water depth, including in unstratified
+columns. ``remora.gls_length_cap=0`` retains the existing opt-out and differs from
+ROMS, which always applies this cap. MY25 (p=0, m=n=1) uses the same predictor.
+
+These corrections change GLS solutions, including restarts from older checkpoints;
+old GLS plotfile benchmarks must be regenerated. The centered fourth-order GLS
+predictor is no longer used. Tracer and momentum advection choices are separate.
 
 +----------------------------------+--------------------------------------+-------------------+----------------+
 | Parameter                        | Definition                           | Acceptable        | Default        |
@@ -1741,7 +1748,7 @@ The ``Gh`` stability limiter applies its quadratic correction only above
 +----------------------------------+--------------------------------------+-------------------+----------------+
 | **remora.gls_length_cap**        | Cap the turbulent length scale at    | 0 if false, 1     | 1              |
 |                                  |                                      |                   |                |
-|                                  | kappa times the local water-column   | if true           |                |
+|                                  | 0.4 times the local water-column     | if true           |                |
 |                                  |                                      |                   |                |
 |                                  | depth, as in ROMS. Applied in every  |                   |                |
 |                                  |                                      |                   |                |

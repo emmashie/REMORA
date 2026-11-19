@@ -1102,7 +1102,7 @@ struct SolverChoice {
     amrex::Real gls_Kmin = amrex::Real(7.6e-6);
     amrex::Real gls_Pmin = amrex::Real(1.0e-12);
 
-    // Cap the turbulent length scale at kappa*Depth (ROMS gls_corstep.F).
+    // Cap the turbulent length scale at 0.4*Depth (ROMS gls_corstep.F).
     // false reproduces the behaviour before this limit was added.
     bool gls_length_cap = true;
 

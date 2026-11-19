@@ -156,7 +156,7 @@ void predictor (REMORA& model)
     }
 }
 
-void corrector (REMORA& model, bool solve)
+void corrector (REMORA& model, bool solve, bool cap)
 {
     Real Kmin = Real(7.6e-6), Pmin = Real(1.e-5), cmu = Real(0.5477), c2 = Real(1.92);
     Real Zos = Real(0.02);
@@ -166,7 +166,7 @@ void corrector (REMORA& model, bool solve)
     Zos = amrex::max(Zos,Real(0.0001));
     const int N = model.Geom(0).Domain().bigEnd(2);
     AMREX_ALWAYS_ASSERT(N == (solve ? 3 : 2));
-    const Real dt = Real(10), old_k = Real(0.01);
+    const Real dt = cap ? Real(0) : Real(10), old_k = Real(0.01);
     const Real old_p = solve ? Real(0.01) : Real(1.e-12);
     const Real decay = old_p/old_k; // k-epsilon: epsilon/k, cmu**(3 + p/n) = 1.
     const Real nu = solve ? Real(0.02) : Real(0);
@@ -195,8 +195,8 @@ void corrector (REMORA& model, bool solve)
                 ParallelFor(mfi.fabbox(), [=] AMREX_GPU_DEVICE (int i, int j, int k)
                 {
                     tke(i,j,k,0) = old_k; gls(i,j,k,0) = old_p;
-                    tke(i,j,k,1) = H*Kmin*(vertical ? Real(2) : Real(0.25));
-                    gls(i,j,k,1) = solve ? H*Pmin*(k == N ? Real(100) : (k == 2 && vertical ? Real(50) : Real(1))) :
+                    tke(i,j,k,1) = cap ? H*old_k : H*Kmin*(vertical ? Real(2) : Real(0.25));
+                    gls(i,j,k,1) = cap ? H*Pmin : solve ? H*Pmin*(k == N ? Real(100) : (k == 2 && vertical ? Real(50) : Real(1))) :
                                           H*Pmin*(vertical ? Real(2) : Real(0.25));
                     tke(i,j,k,2) = Kmin; gls(i,j,k,2) = Pmin;
                     zw(i,j,k) = H*k; w(i,j,k) = speed*k;
@@ -207,7 +207,19 @@ void corrector (REMORA& model, bool solve)
                 model.vec_Akp[0].get(),model.vec_mskr[0].get(),model.vec_msku[0].get(),
                 model.vec_mskv[0].get(),0,1,N,dt);
             Vector<Real> expected_k(N,Kmin), expected_p(N,Pmin);
-            if (!solve) {
+            if (cap) {
+                Real expected_length = Real(0.4)*H*(N+1);
+                bool enabled = true;
+                pp.query("gls_length_cap",enabled);
+                if (!enabled) {
+                    expected_length = cmu*cmu*cmu*std::pow(old_k,Real(1.5))/Pmin;
+                }
+                for (int n = 0; n < N; ++n) {
+                    expected_k[n] = old_k;
+                    expected_p[n] = cmu*cmu*cmu*std::pow(old_k,Real(1.5))/expected_length;
+                }
+
+            } else if (!solve) {
                 const Real weighted = amrex::max(H, H-dt*speed);
                 for (int n = 0; n < N; ++n) {
                     expected_k[n] = amrex::max(Kmin, weighted*Kmin/(H*(Real(1)+dt*decay)));
@@ -241,6 +253,15 @@ void corrector (REMORA& model, bool solve)
                 // are Dirichlet. Copy each horizontal slice for global extrema assertions.
                 const Box slice = makeSlab(amrex::convert(model.Geom(0).Domain(),
                                                         IntVect(0,0,1)),2,n+1);
+                if (cap) {
+                    MultiFab selected(BoxArray(slice),DistributionMapping(BoxArray(slice)),1,0);
+                    selected.ParallelCopy(*model.vec_Lscale[0],0,0,1,0,0);
+                    bool enabled = true;
+                    pp.query("gls_length_cap",enabled);
+                    const Real expected = enabled ? Real(0.4)*H*(N+1) :
+                        cmu*cmu*cmu*std::pow(old_k,Real(1.5))/Pmin;
+                    check_field(selected,0,expected,"Length cap differs from ROMS 0.4*depth");
+                }
                 for (auto field : {model.vec_tke[0].get(),model.vec_gls[0].get()}) {
                     MultiFab selected(BoxArray(slice),DistributionMapping(BoxArray(slice)),1,0);
                     selected.ParallelCopy(*field,1,0,1,0,0);
@@ -265,7 +286,7 @@ int main (int argc, char* argv[])
         ParmParse("test").get("case",name);
         if (name == "predictor") { predictor(model); }
         else if (name == "evolve" || name == "regrid") { evolve(model,name == "regrid"); }
-        else { corrector(model,name == "solve"); }
+        else { corrector(model,name == "solve",name == "cap"); }
         amrex::Print() << "GLS " << name << " reference checks passed\n";
     }
     amrex::Finalize();

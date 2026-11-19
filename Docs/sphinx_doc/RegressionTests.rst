@@ -39,6 +39,39 @@ Results from the nightly GPU tests can be found here: `GPU tests`_
 
 .. _`GPU tests`: https://ccse.lbl.gov/pub/GpuRegressionTesting/REMORA
 
+GLS benchmark updates
+~~~~~~~~~~~~~~~~~~~~~
+
+The corrected GLS equations change the answers for cases that use GLS vertical
+mixing. The CI references are ``BoundaryLayer``, ``Channel_Test``,
+``Channel_Test_ML_seam`` and ``Upwelling_GLS``. Regenerate them with the same input
+decks and output step; compare runs with different MPI layouts before replacing
+references. The independent closure checks in :ref:`gls-closure-tests` establish
+the equations separately from these snapshots.
+
+Each dated nightly results directory publishes ``REMORA-tests.ini``. Test detail
+pages publish the actual input, auxiliary NetCDF files, command, source hashes and
+comparison command. For example, the `CPU configuration from 2026-11-19
+<https://ccse.lbl.gov/pub/RegressionTesting1/REMORA/2026-11-19/REMORA-tests.ini>`_
+and `GPU configuration from 2026-11-19
+<https://ccse.lbl.gov/pub/GpuRegressionTesting/REMORA/2026-11-19/REMORA-tests.ini>`_
+identify these benchmark roots on the test machines:
+
+- CPU: ``/scratch/AMReX_RegTesting/rt-REMORA/REMORA-benchmarks``.
+- GPU: ``/home/regtester/RegTesting/rt-REMORA/REMORA-GPU-benchmarks``.
+
+Refresh the BoundaryLayer, ChannelTest, Upwelling_GLS (including Canuto A/B), and
+BioToy families, including their restart and layout variants. BioToy explicitly
+disables the cap in its base input; its ``GLSLengthCap`` variant enables it.
+IdealRivGrid's published input uses analytic mixing, so it only needs a GLS
+benchmark update if GLS is enabled. CoupleToERF enables GLS in its ocean input but
+is absent from these nightly configurations; its coupled benchmarks are separate.
+
+Benchmark replacement runs on each test machine with its compiler, AMReX revision
+and CPU/GPU configuration. Locally generated outputs are candidates for review,
+not replacements for the other architecture's benchmarks. When copying a nightly
+configuration for local validation, change its paths and disable email delivery.
+
 Continuous Integration (CI) Tests
 ---------------------------------
 

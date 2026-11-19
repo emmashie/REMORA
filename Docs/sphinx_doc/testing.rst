@@ -67,7 +67,7 @@ Output for the last set of tests run is available in the ``Build`` directory in 
 .. _gls-closure-tests:
 
 GLS closure and level lifecycle checks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Run ``ctest -R GLS_ --output-on-failure`` for the closure and regrid checks.
 ``GLS_math`` checks the expanded upstream face stencil for both flow directions,
@@ -85,8 +85,16 @@ so the bottom limit is checked independently. These manufactured-column tests us
 of 1e-5 to expose the solve's result without activating the length cap. The physical
 application defaults, including the TKE minimum, are unchanged.
 The references use the expanded stencil and independently evaluated column equations
-from the GLS files at `COAWST snapshot 1d7b0baa
-<https://github.com/jcwarner-usgs/COAWST/tree/1d7b0baa23b4065c64c0d889b94439371e94f16b/ROMS/Nonlinear>`_.
+from the three closure files changed by `ROMS PR 51, commit e24c27db
+<https://github.com/myroms/roms/commit/e24c27dbe5074013971ca4c1a452de59f93b2f86>`_.
+Vegetation, Kantha--Clayson options and tracer-diffusion changes from the PR merge
+are outside this correction. MY25 uses the same GLS predictor with p=0, m=n=1.
+
+``GLS_correction_cap`` checks the physical length scale against 0.4 times total
+water depth with the cap active; ``GLS_correction_cap_disabled`` checks the existing
+opt-out. The coefficient is separate from the 0.41 von Karman constant used for other
+boundary physics. ``GLS_MY25_layout`` checks the shared
+MY25 route under tiled and untiled execution.
 
 ``GLS_Seamount_layout`` advances Canuto A at a 10 s timestep and compares plotfiles
 and every checkpoint field between tiled and untiled runs. The two
@@ -106,6 +114,33 @@ Run ``ctest -R GLS_regrid_ --output-on-failure`` for these channel-based checks:
   identical final plotfiles and valid checkpoint values, including every GLS component.
 
 These tests need no NetCDF files or gold plotfiles and run with invalid-operation traps on.
+
+Whole-run comparison with ROMS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use a ROMS build containing PR 51 (for example commit ``e24c27db``), with
+``GLS_MIXING`` enabled and ``K_C4ADVECTION`` disabled. Match the stability function,
+closure parameters, minima and 0.4-times-depth cap. An upwelling comparison also
+needs matching gravity, vertical coordinates, advection, diffusion, wind stress,
+boundary conditions and time steps. ROMS spline vertical diffusion and viscosity
+must be disabled when comparing against REMORA's standard vertical operators.
+Use double-precision ROMS history output (``OUT_DOUBLE``).
+
+Check bathymetry and every initial field before comparing evolved output. The two
+analytic upwelling grids have different half-cell bathymetry conventions. A
+PnetCDF-enabled REMORA run can read the initial ROMS history record as both its
+``nc_grid_file_0`` and ``nc_init_file_0`` with ``ic_type=netcdf`` and
+``mask_type=none`` for this unmasked case. This preserves the unmodified ROMS grid
+and initial state. Keep the Upwelling problem selection for its analytic wind.
+
+Compare records at equal elapsed seconds, trim ROMS horizontal halo cells and
+retain the full normal extent of staggered velocity faces. Read the latest GLS
+history component from the REMORA checkpoint, rather than predictor component 2.
+Report absolute errors with units and errors relative to the ROMS field maximum.
+Run long enough for interior TKE to exceed its floor; otherwise an apparently
+close TKE comparison can miss differences in the evolving turbulence. Agreement
+of the isolated closure equations does not establish agreement of the complete
+models.
 
 Adding Tests
 ~~~~~~~~~~~~

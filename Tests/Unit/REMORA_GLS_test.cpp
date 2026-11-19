@@ -36,13 +36,19 @@ int main ()
         };
         check("positive flow", flux(2,0,3,true), Real(17)/Real(3));
         check("negative flow", flux(-2,0,3,true), -Real(16)/Real(3));
+        check("fine-domain interior at a coarse-domain edge", flux(-2,0,7,false),
+              -Real(16)/Real(3));
         check("zero flow", flux(0,0,3,true), 0);
         check("exterior west/south curvature", flux(2,2,5,false), 6);
         check("exterior east/north curvature", flux(-2,-2,1,false), -6);
         masks.fill(Real(0));
+        check("masked west/south exterior curvature", flux(2,2,5,false), 6);
+        check("masked east/north exterior curvature", flux(-2,-2,1,false), -6);
         check("masked gradients", flux(2,0,3,true), 6);
         masks.fill(Real(1));
         mask(i,j,0) = 0;
+        check("masked boundary gradient copied west/south", flux(2,2,5,false), 6);
+        check("masked boundary gradient copied east/north", flux(-2,-2,1,false), -6);
         check("masked center gradient, positive", flux(2,0,3,true), Real(19)/Real(3));
         check("masked center gradient, negative", flux(-2,0,3,true), -Real(14)/Real(3));
     }

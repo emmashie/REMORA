@@ -1079,14 +1079,23 @@ foreach(mode lockstep subcycle)
                                 "chk00003")
 endforeach()
 
-# Manufactured turbulence fields exercise the actual predictor and two-interface solve.
-foreach(case predictor bounds solve)
+# Manufactured turbulence fields exercise the predictor, implicit solve, and length cap.
+foreach(case predictor bounds solve cap)
     set(nz 3)
     if(case STREQUAL "solve")
         set(nz 4)
     endif()
-    add_test_run(GLS_correction_${case} DoublyPeriodic remora_gls_correction
-      "amr.max_level=0 remora.n_cell=12 12 ${nz} remora.is_periodic=1 1 0 remora.bc.ylo.type=Periodic remora.bc.yhi.type=Periodic remora.fixed_dt=10 remora.max_step=0 remora.plot_int=-1 remora.check_int=-1 remora.vertical_mixing_type=gls remora.gls_stability_type=canuto_a remora.gls_Pmin=1e-5 test.case=${case}")
+    set(pmin 1e-5)
+    if(case STREQUAL "cap")
+        set(pmin 1e-12)
+    endif()
+    set(correction_options
+      "amr.max_level=0 remora.n_cell=12 12 ${nz} remora.is_periodic=1 1 0 remora.bc.ylo.type=Periodic remora.bc.yhi.type=Periodic remora.fixed_dt=10 remora.max_step=0 remora.plot_int=-1 remora.check_int=-1 remora.vertical_mixing_type=gls remora.gls_stability_type=canuto_a remora.gls_Pmin=${pmin} test.case=${case}")
+    add_test_run(GLS_correction_${case} DoublyPeriodic remora_gls_correction "${correction_options}")
+    if(case STREQUAL "cap")
+        add_test_run(GLS_correction_cap_disabled DoublyPeriodic remora_gls_correction
+          "${correction_options} remora.gls_length_cap=0")
+    endif()
 endforeach()
 
 compose_test_input(GLS_Seamount_layout Seamount)
@@ -1106,3 +1115,9 @@ foreach(mode lockstep subcycle)
       "remora.do_substep=${subcycle}"
       "remora.do_substep=${subcycle} remora.restart=../runA/chk00002 test.case=evolve")
 endforeach()
+
+# MY25 shares the GLS predictor, with p=0 and m=n=1.
+compose_test_input(GLS_MY25_layout Seamount GLS_Seamount_layout)
+add_test_layout(GLS_MY25_layout GLS_MY25_layout remora_gls_correction
+  "plt00003" "chk00003" "remora.gls_P=0 remora.gls_M=1 remora.gls_N=1 remora.omp_tile_size=8 8 1024000"
+  "remora.gls_P=0 remora.gls_M=1 remora.gls_N=1 remora.omp_tile_size=1024000 1024000 1024000")
